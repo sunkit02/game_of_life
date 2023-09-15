@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conway's Game of Life - Sun Kit Tsui</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #root {
+      display: flex;
+      flex-direction: column;
+
+      height: 80vh;
+      width: 80vh;
+    }
+
+    .row {
+      display: flex;
+      flex-direction: row;
+    }
+
+    .tile {
+      /* width: 40px; */
+      /* height: 40px; */
+      /* border: 1px solid grey; */
+    }
+
+    .on {
+      background-color: black;
+    }
+
+    .off {
+      background-color: white;
+    }
+
+    #start-btn {
+      margin: 0rem 0rem 1rem;
+      padding: 0.7rem 2rem;
+
+      font-size: 1.5rem;
+    }
+
+    .h-container {
+      display: flow;
+      flow-direction: row;
+    }
+  </style>
+</head>
+
+<body>
+  <h1 style="text-align: center">Conway's Game of Life</h1>
+  <div class="h-container">
+    <label>
+      Minimum tiles per side:
+      <input id="min-tiles-input" type="number" value="50" />
+    </label>
+    <label>
+      Delay between refresh in ms:
+      <input id="refresh-delay-input" type="number" value="500" />
+
+    </label>
+    <button id="start-btn" onclick="handleStart()">Start</button>
+  </div>
+  <h3 id="iter-count-label">Iteration: 0</h3>
+  <div id="root"></div>
+</body>
+
+<script>
+  // minimum number of tiles on the shortest side
+  const minTiles = 50;
+
+  const root = document.querySelector("#root");
+  const tileSize = Math.floor(Math.min(root.offsetWidth, root.offsetHeight) / minTiles);
+
+  let width = Math.floor(root.offsetWidth / tileSize);
+  let height = Math.floor(root.offsetHeight / tileSize);
+
+  const minTilesInput = document.querySelector("#min-tiles-input");
+  const refreshDelayInput = document.querySelector("#refresh-delay-input");
+
+
+  let currentX = 0;
+  let currentY = 0;
+
+  let REFRESH_DELAY = 500;
+  let currentIteration = 0;
+
+  const currentIterationLabel = document.querySelector("#iter-count-label");
+
+  minTilesInput.addEventListener("change", (e) => {
+    minTiles = e.target.value;
+  })
+
+  refreshDelayInput.addEventListener("change", (e) => {
+    REFRESH_DELAY = e.target.value;
+  })
+
+  let isRunning = false;
+
+  function initializeMatrix(width, height) {
+    let matrix = [];
+
+    for (let i = 0; i < width; ++i) {
+      let row = [];
+      for (let j = 0; j < height; ++j) {
+        row.push({
+          isAlive: 0,
+          tmp: 0,
+        })
+      }
+      matrix.push(row);
+    }
+
+    return matrix;
+  }
+
+  function handleTileClicked(e) {
+    let tile = e.target;
+    let id = tile.id;
+    let [, x, y] = id.split("-");
+
+    let isAlive = matrix[x][y].isAlive;
+
+    if (isAlive) {
+      tile.className = "tile off"
+    } else {
+      tile.className = "tile on"
+    }
+
+    matrix[x][y].isAlive = !isAlive;
+  }
+
+  function calculateFate(matrix, x, y) {
+    let isAlive = matrix[x][y].isAlive;
+
+    let livingNeighbors = 0;
+    // matrix[x][y-1] left
+    if (y - 1 >= 0) {
+      livingNeighbors += matrix[x][y - 1].isAlive;
+    }
+
+    // matrix[x][y+1] right
+    if (y + 1 < matrix[0].length) {
+      livingNeighbors += matrix[x][y + 1].isAlive;
+    }
+
+    // matrix[x-1][y] up
+    if (x - 1 >= 0) {
+      livingNeighbors += matrix[x - 1][y].isAlive;
+    }
+
+    // matrix[x+1][y] down
+    if (x + 1 < matrix.length) {
+      livingNeighbors += matrix[x + 1][y].isAlive;
+    }
+
+    // matrix[x-1][y-1] top-left
+    if (x - 1 >= 0 && y - 1 >= 0) {
+      livingNeighbors += matrix[x - 1][y - 1].isAlive;
+    }
+
+    // matrix[x-1][y+1] top-right
+    if (x - 1 >= 0 && y + 1 < matrix[0].length) {
+      livingNeighbors += matrix[x - 1][y + 1].isAlive;
+    }
+
+    // matrix[x+1][y-1] bot-left
+    if (x + 1 < matrix.length && y - 1 >= 0) {
+      livingNeighbors += matrix[x + 1][y - 1].isAlive;
+    }
+
+    // matrix[x+1][y+1] bot-right
+    if (x + 1 < matrix.length && y + 1 < matrix[0].length) {
+      livingNeighbors += matrix[x + 1][y + 1].isAlive;
+    }
+
+    if (isAlive && (livingNeighbors > 3 || livingNeighbors < 2)) {
+      isAlive = 0;
+    } else if (!isAlive && livingNeighbors == 3) {
+      isAlive = 1;
+    }
+
+    return isAlive;
+  }
+
+  function updateMatrix(matrix) {
+    for (let x = 0; x < matrix.length; ++x) {
+      for (let y = 0; y < matrix[0].length; ++y) {
+        if (!isRunning) break;
+
+        let id = `#tile-${x}-${y}`;
+        let tile = document.querySelector(id);
+        let tmpIsAlive = calculateFate(matrix, x, y);
+        matrix[x][y].tmp = tmpIsAlive;
+      }
+    }
+
+    if (!isRunning) return;
+
+    for (let x = 0; x < matrix.length; ++x) {
+      for (let y = 0; y < matrix[0].length; ++y) {
+        let id = `#tile-${x}-${y}`;
+        let tile = document.querySelector(id);
+
+        matrix[x][y].isAlive = matrix[x][y].tmp;
+
+        if (matrix[x][y].isAlive) {
+          tile.className = "tile on"
+        } else {
+          tile.className = "tile off"
+        }
+      }
+    }
+
+    currentIterationLabel.innerHTML = "Iteration: " + currentIteration++;
+  }
+
+  function recursiveUpdateMatrix(matrix) {
+    if (isRunning) {
+      setTimeout(() => {
+        updateMatrix(matrix);
+        recursiveUpdateMatrix(matrix);
+      }, REFRESH_DELAY);
+    }
+  }
+
+  function handleStart() {
+    let btn = document.querySelector("#start-btn");
+
+    isRunning = !isRunning;
+
+    if (isRunning) {
+      btn.innerHTML = "Stop";
+      updateMatrix(matrix);
+      recursiveUpdateMatrix(matrix, REFRESH_DELAY);
+    } else {
+      btn.innerHTML = "Start";
+    }
+  }
+
+
+  const matrix = initializeMatrix(width, height);
+
+  // initialize visual matrix
+  for (let i = 0; i < width; ++i) {
+    let row = document.createElement("div");
+    row.className = "row";
+    row.id = `row-${i}`;
+    root.appendChild(row);
+    for (let j = 0; j < height; ++j) {
+      let tile = document.createElement("div");
+      tile.classList.add("tile", "off");
+      tile.id = `tile-${i}-${j}`;
+      tile.style.width = `${tileSize}px`;
+      tile.style.height = `${tileSize}px`;
+
+      tile.addEventListener("click", handleTileClicked)
+
+      row.appendChild(tile);
+    }
+  }
+
+  console.log(matrix);
+</script>
+
+</html>
